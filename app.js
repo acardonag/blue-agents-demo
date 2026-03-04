@@ -490,6 +490,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const cedLogin = loginUserData.cedula;
             localStorage.setItem('bbva_user',    loginUserData.name);
             localStorage.setItem('bbva_user_id', loginUserData.cedula);
+            // Usar el valor que ya tiene loginUserData (viene de Firestore si el usuario
+            // escribió la cédula manualmente, o de localStorage si era sesión guardada)
             localStorage.setItem('bbva_pagos_inteligentes', loginUserData.pagosInteligentes ? 'true' : 'false');
             updateUI();
             clearLoginError();
@@ -500,6 +502,16 @@ document.addEventListener('DOMContentLoaded', () => {
             loadDashboardBalances();
             // Solicitar permiso push y registrar FCM token
             if (window.initPushNotifications) window.initPushNotifications(cedLogin);
+            // Re-sincronizar pagosInteligentes desde Firestore en segundo plano
+            // (necesario cuando el login omitió la búsqueda en Firestore por sesión guardada)
+            if (window.getUserByCedula) {
+                window.getUserByCedula(cedLogin).then(freshData => {
+                    if (freshData) {
+                        localStorage.setItem('bbva_pagos_inteligentes', freshData.pagosInteligentes ? 'true' : 'false');
+                        updatePromoBanner();
+                    }
+                }).catch(() => {});
+            }
             // Mostrar modal de bienvenida PI si aplica
             showPIWelcomeModal();
         }
@@ -601,6 +613,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('logout-confirm')?.addEventListener('click', () => {
         logoutModal.style.display = 'none';
+        // Limpiar sesión del usuario anterior para evitar contaminación de estado
+        localStorage.removeItem('bbva_user');
+        localStorage.removeItem('bbva_user_name');
+        localStorage.removeItem('bbva_user_id');
+        localStorage.removeItem('bbva_user_email');
+        localStorage.removeItem('bbva_pagos_inteligentes');
+        localStorage.removeItem('bbva_pi_modal_dismissed');
+        // Resetear toggle PI a inactivo
+        const tog = document.getElementById('pi-toggle');
+        if (tog) tog.checked = false;
+        applyPIToggleUI(false);
+        updatePromoBanner();
         showScreen('welcome-screen');
     });
     // ── Pagos Inteligentes ──
@@ -694,6 +718,14 @@ document.addEventListener('DOMContentLoaded', () => {
             if (piCardEl) {
                 piCardEl.classList.remove('skeleton');
                 piCardEl.textContent = card?.cardNumber || '—';
+            }
+
+            // Sincronizar toggle principal desde Firestore
+            if (userData) {
+                const piActive = !!userData.pagosInteligentes;
+                if (piToggle) piToggle.checked = piActive;
+                localStorage.setItem(PI_KEY, piActive ? 'true' : 'false');
+                applyPIToggleUI(piActive);
             }
 
             // Restaurar checkboxes desde Firestore

@@ -117,11 +117,12 @@ async function registerUserInFirestore(name, cedula, email) {
         throw e; // re-lanzar para que app.js lo capture y muestre el error real
     }
 
-    localStorage.setItem('bbva_user',       name);
-    localStorage.setItem('bbva_user_name',  name);
-    localStorage.setItem('bbva_user_id',    cedula);
-    localStorage.setItem('bbva_user_email', email);
-    localStorage.setItem('bbva_device_id',  deviceId);
+    localStorage.setItem('bbva_user',               name);
+    localStorage.setItem('bbva_user_name',          name);
+    localStorage.setItem('bbva_user_id',            cedula);
+    localStorage.setItem('bbva_user_email',         email);
+    localStorage.setItem('bbva_device_id',          deviceId);
+    localStorage.setItem('bbva_pagos_inteligentes', 'false'); // nuevo usuario siempre inicia con PI desactivado
 
     return userData;
 }
