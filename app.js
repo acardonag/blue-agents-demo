@@ -37,6 +37,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // ── Formateo de moneda COP ──
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('es-CO', {
+            style:                 'currency',
+            currency:              'COP',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount);
+    };
+
+    // ── Carga saldos reales desde Firestore en el dashboard ──
+    async function loadDashboardBalances() {
+        const cedula = localStorage.getItem('bbva_user_id');
+        if (!cedula) return;
+
+        // Esperar a Firebase si no está listo aún
+        if (!window.firebaseReady) {
+            await new Promise((resolve, reject) => {
+                const t = setTimeout(() => reject(new Error('Firebase timeout')), 8000);
+                window.addEventListener('firebase-ready', () => { clearTimeout(t); resolve(); }, { once: true });
+            }).catch(() => null);
+        }
+        if (!window.getUserAccount) return;
+
+        try {
+            const [account, card] = await Promise.all([
+                window.getUserAccount(cedula),
+                window.getUserCreditCard(cedula)
+            ]);
+
+            if (account) {
+                const balanceEl = document.getElementById('account-balance');
+                if (balanceEl) {
+                    balanceEl.innerHTML = `${formatCurrency(account.balance)} <span class="balance-currency">COP</span>`;
+                }
+            }
+            if (card) {
+                const cardBalanceEl = document.getElementById('card-available-balance');
+                const cardNumEl     = document.getElementById('card-number-display');
+                if (cardBalanceEl) cardBalanceEl.textContent = formatCurrency(card.availableBalance);
+                if (cardNumEl)     cardNumEl.textContent     = card.cardNumber;
+            }
+        } catch (err) {
+            console.error('❌ Error cargando saldos:', err);
+        }
+    }
+
     updateUI();
 
     // ── Auto-navegar si viene de payment-approval ──
@@ -44,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (urlParams.get('screen') === 'dashboard') {
         updatePromoBanner();
         showScreen('dashboard-screen');
+        loadDashboardBalances();
         history.replaceState({}, '', window.location.pathname);
     }
 
@@ -165,6 +213,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             console.log('🚀 Firebase listo, registrando usuario...');
             await window.registerUserInFirestore(name, cedula, email);
+
+            // Crear cuenta de ahorros y tarjeta de crédito
+            if (window.createUserFinancialData) {
+                await window.createUserFinancialData(cedula);
+            }
 
             state.userName = name;
             updateUI();
@@ -418,6 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loginStep = 'cedula';
             loginUserData = null;
             showScreen('dashboard-screen');
+            loadDashboardBalances();
             // Solicitar permiso push y registrar FCM token
             if (window.initPushNotifications) window.initPushNotifications(cedLogin);
             // Mostrar modal de bienvenida PI si aplica
@@ -474,6 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 updatePromoBanner();
                 showScreen('dashboard-screen');
+                loadDashboardBalances();
                 // Mostrar modal de éxito de autenticación
                 const successModal = document.getElementById('auth-success-modal');
                 if (successModal) {
@@ -488,6 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('[fingerprint] Flujo NORMAL → dashboard');
                 updatePromoBanner();
                 showScreen('dashboard-screen');
+                loadDashboardBalances();
                 showPIWelcomeModal();
                 const cedBio = localStorage.getItem('bbva_user_id');
                 if (window.initPushNotifications) window.initPushNotifications(cedBio);

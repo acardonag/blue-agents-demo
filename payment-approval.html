@@ -16,6 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script type="module" src="firebase-init.js"></script>
     <style>
         /* ── Pantalla Aprobación ── */
         #approval-screen {
@@ -623,6 +624,10 @@
                         </span>
                     </span>
                 </div>
+                <div class="rec-row">
+                    <span class="rec-row-label">Saldo posterior</span>
+                    <span class="rec-row-value" id="rec-new-balance" style="color:var(--bbva-light-blue);">—</span>
+                </div>
             </div>
 
             <div class="rec-footer">
@@ -730,7 +735,7 @@
             document.getElementById('rejected-screen').classList.remove('active');
         }
 
-        function showReceipt() {
+        function showReceipt(newBalance) {
             clearInterval(countdown);
             // Poblar comprobante
             const now = new Date();
@@ -741,6 +746,14 @@
             document.getElementById('rec-card').textContent      = card;
             document.getElementById('rec-date').textContent      = now.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
             document.getElementById('rec-time').textContent      = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+            // Saldo posterior
+            const newBalanceEl = document.getElementById('rec-new-balance');
+            if (newBalanceEl && typeof newBalance === 'number') {
+                newBalanceEl.textContent = new Intl.NumberFormat('es-CO', {
+                    style: 'currency', currency: 'COP', minimumFractionDigits: 0
+                }).format(newBalance);
+            }
 
             document.getElementById('approval-screen').classList.remove('active');
             document.getElementById('receipt-screen').classList.add('active');
@@ -776,10 +789,28 @@
                 svg.style.color      = '#00c9a7';
                 svg.style.stroke     = '#00c9a7';
             }
-            setTimeout(() => {
+            setTimeout(async () => {
                 bioModal.style.display = 'none';
                 if (svg) { svg.style.color = ''; svg.style.stroke = ''; }
-                showReceipt();
+
+                // Debitar el monto en Firestore
+                let newBalance;
+                try {
+                    const cedula = localStorage.getItem('bbva_user_id');
+                    if (cedula && window.deductPayment) {
+                        const source        = params.get('source') || 'account';
+                        const numericAmount = parseInt(rawAmount.replace(/\D/g, ''), 10);
+                        const result        = await window.deductPayment(cedula, numericAmount, source);
+                        newBalance          = result.newBalance;
+                        console.log('✅ Pago debitado. Nuevo saldo:', newBalance);
+                    } else {
+                        console.warn('⚠️ deductPayment no disponible (Firebase aún no listo)');
+                    }
+                } catch (err) {
+                    console.error('❌ Error debitando pago:', err.message);
+                }
+
+                showReceipt(newBalance);
             }, 1200);
         });
 
@@ -806,7 +837,8 @@
 
         // Compartir comprobante
         document.getElementById('rec-share').addEventListener('click', async () => {
-            const text = `Comprobante BBVA\nProducto: ${productName}\nMonto: ${amountFormatted}\nReferencia: ${reference}\nID Transacción: ${txId}\nTarjeta: ${card}`;
+            const newBalanceText = document.getElementById('rec-new-balance')?.textContent;
+            const text = `Comprobante BBVA\nProducto: ${productName}\nMonto: ${amountFormatted}\nReferencia: ${reference}\nID Transacción: ${txId}\nMétodo de pago: ${card}${newBalanceText && newBalanceText !== '—' ? `\nSaldo posterior: ${newBalanceText}` : ''}`;
             if (navigator.share) {
                 await navigator.share({ title: 'Comprobante BBVA', text });
             } else {

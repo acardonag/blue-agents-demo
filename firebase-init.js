@@ -1,5 +1,5 @@
 import { initializeApp }                          from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getFirestore, doc, setDoc, getDoc }      from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getMessaging, getToken, onMessage }       from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js';
 
 // ── VAPID Key generada en Firebase Console → Project Settings → Cloud Messaging
@@ -70,7 +70,6 @@ async function updatePagosInteligentes(isActive) {
         return;
     }
     try {
-        const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
         console.log('[updatePagosInteligentes] Ejecutando updateDoc en users/' + cedula);
         await updateDoc(doc(db, 'users', cedula), { pagosInteligentes: isActive });
         console.log('✅ pagosInteligentes actualizado en Firestore:', isActive);
@@ -110,6 +109,123 @@ async function registerUserInFirestore(name, cedula, email) {
     localStorage.setItem('bbva_device_id',  deviceId);
 
     return userData;
+}
+
+// ── Cuenta de Ahorros y Tarjeta de Crédito ───────────────────
+
+/**
+ * Crea los datos financieros (cuenta + tarjeta) al registrar un usuario.
+ * accountId    = últimos 3 dígitos de la cédula
+ * creditCardId = primeros 3 dígitos de la cédula
+ */
+async function createUserFinancialData(cedula) {
+    try {
+        const accountId    = cedula.slice(-3);
+        const creditCardId = cedula.slice(0, 3);
+
+        const accountRef = doc(db, 'accounts', accountId);
+        const cardRef    = doc(db, 'creditCards', creditCardId);
+
+        const [accountSnap, cardSnap] = await Promise.all([getDoc(accountRef), getDoc(cardRef)]);
+
+        if (!accountSnap.exists()) {
+            await setDoc(accountRef, {
+                cedula,
+                accountId,
+                accountNumber: `COL-${accountId}-BBVA`,
+                type:          'Cuenta de Ahorros',
+                balance:       12000000,
+                currency:      'COP',
+                createdAt:     new Date().toISOString()
+            });
+            console.log('✅ Cuenta de ahorros creada:', accountId);
+        }
+
+        if (!cardSnap.exists()) {
+            await setDoc(cardRef, {
+                cedula,
+                creditCardId,
+                cardNumber:       `**** **** **** ${creditCardId}0`,
+                type:             'Tarjeta de Crédito',
+                brand:            'Visa',
+                availableBalance: 4000000,
+                totalLimit:       4000000,
+                currency:         'COP',
+                createdAt:        new Date().toISOString()
+            });
+            console.log('✅ Tarjeta de crédito creada:', creditCardId);
+        }
+
+        return { accountId, creditCardId };
+    } catch (err) {
+        console.error('❌ Error creando datos financieros:', err);
+        throw err;
+    }
+}
+
+/** Obtiene la cuenta de ahorros del usuario */
+async function getUserAccount(cedula) {
+    try {
+        const snap = await getDoc(doc(db, 'accounts', cedula.slice(-3)));
+        return snap.exists() ? snap.data() : null;
+    } catch (err) {
+        console.error('❌ Error obteniendo cuenta:', err);
+        return null;
+    }
+}
+
+/** Obtiene la tarjeta de crédito del usuario */
+async function getUserCreditCard(cedula) {
+    try {
+        const snap = await getDoc(doc(db, 'creditCards', cedula.slice(0, 3)));
+        return snap.exists() ? snap.data() : null;
+    } catch (err) {
+        console.error('❌ Error obteniendo tarjeta:', err);
+        return null;
+    }
+}
+
+/**
+ * Descuenta un monto del saldo.
+ * @param {string} cedula
+ * @param {number} amount
+ * @param {'account'|'card'} source
+ * @returns {{ newBalance: number }}
+ */
+async function deductPayment(cedula, amount, source = 'account') {
+    if (source === 'account') {
+        const accountRef  = doc(db, 'accounts', cedula.slice(-3));
+        const accountSnap = await getDoc(accountRef);
+        if (!accountSnap.exists()) throw new Error('Cuenta no encontrada');
+        const current = accountSnap.data().balance;
+        if (current < amount) throw new Error('Saldo insuficiente');
+        const newBalance = current - amount;
+        await updateDoc(accountRef, {
+            balance:                newBalance,
+            lastTransactionAt:      new Date().toISOString(),
+            lastTransactionAmount:  -amount
+        });
+        console.log(`✅ Débito cuenta: -$${amount.toLocaleString('es-CO')} | Nuevo saldo: $${newBalance.toLocaleString('es-CO')}`);
+        return { newBalance };
+    }
+
+    if (source === 'card') {
+        const cardRef  = doc(db, 'creditCards', cedula.slice(0, 3));
+        const cardSnap = await getDoc(cardRef);
+        if (!cardSnap.exists()) throw new Error('Tarjeta no encontrada');
+        const current = cardSnap.data().availableBalance;
+        if (current < amount) throw new Error('Cupo insuficiente');
+        const newBalance = current - amount;
+        await updateDoc(cardRef, {
+            availableBalance:       newBalance,
+            lastTransactionAt:      new Date().toISOString(),
+            lastTransactionAmount:  -amount
+        });
+        console.log(`✅ Cargo tarjeta: -$${amount.toLocaleString('es-CO')} | Cupo restante: $${newBalance.toLocaleString('es-CO')}`);
+        return { newBalance };
+    }
+
+    throw new Error('Fuente de pago inválida: ' + source);
 }
 
 // ── Solicitar permiso push y obtener FCM Token ────────────────
@@ -162,7 +278,6 @@ async function initPushNotifications(cedula) {
 
         // Guardar en Firestore
         if (cedula) {
-            const { updateDoc } = await import('https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js');
             await updateDoc(doc(db, 'users', cedula), {
                 fcmToken:     token,
                 fcmUpdatedAt: new Date().toISOString(),
@@ -221,6 +336,10 @@ window.checkUserExists             = checkUserExists;
 window.getUserByCedula             = getUserByCedula;
 window.updatePagosInteligentes     = updatePagosInteligentes;
 window.initPushNotifications       = initPushNotifications;
+window.createUserFinancialData     = createUserFinancialData;
+window.getUserAccount              = getUserAccount;
+window.getUserCreditCard           = getUserCreditCard;
+window.deductPayment               = deductPayment;
 window.firestoreDoc                = doc;
 window.firestoreSetDoc             = setDoc;
 window.firestoreGetDoc             = getDoc;
