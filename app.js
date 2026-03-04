@@ -695,6 +695,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Guardar configuración
     document.getElementById('pi-save')?.addEventListener('click', async () => {
         const isActive = piToggle?.checked ?? false;
+
+        // ── Validación: PI activo requiere al menos 1 medio de pago Y 1 canal ──
+        if (isActive) {
+            const hasPaymentMethod =
+                document.getElementById('pi-pm-account')?.checked ||
+                document.getElementById('pi-pm-card')?.checked;
+            const hasChannel =
+                document.getElementById('pi-ch-whatsapp')?.checked ||
+                document.getElementById('pi-ch-telegram')?.checked ||
+                document.getElementById('pi-ch-alexa')?.checked    ||
+                document.getElementById('pi-ch-chats')?.checked;
+
+            if (!hasPaymentMethod && !hasChannel) {
+                showPIToast('Debes seleccionar al menos un medio de pago y un canal autorizado.', true);
+                return;
+            }
+            if (!hasPaymentMethod) {
+                showPIToast('Debes seleccionar al menos un medio de pago autorizado.', true);
+                return;
+            }
+            if (!hasChannel) {
+                showPIToast('Debes seleccionar al menos un canal autorizado.', true);
+                return;
+            }
+        }
+
         console.log('[pi-save] Guardando. isActive:', isActive);
         localStorage.setItem(PI_KEY, isActive);
 
@@ -722,18 +748,29 @@ document.addEventListener('DOMContentLoaded', () => {
         const msg = isActive
             ? 'Pagos Inteligentes activados correctamente'
             : 'Pagos Inteligentes desactivados';
+        showPIToast(msg, false);
+        updatePromoBanner();
+    });
 
-        piToastMsg.textContent = msg;
+    // ── Helper toast PI (éxito y error) ──
+    function showPIToast(message, isError = false) {
+        piToastMsg.textContent = message;
+        const icon = piToast.querySelector('[data-lucide]');
+        if (icon) {
+            icon.setAttribute('data-lucide', isError ? 'alert-circle' : 'check-circle');
+            icon.style.color = isError ? '#e53935' : '';
+        }
+        piToast.classList.toggle('pi-toast-error', isError);
         piToast.classList.remove('pi-toast-hidden');
         piToast.classList.add('pi-toast-visible');
         if (window.lucide) window.lucide.createIcons();
-        updatePromoBanner();
-
-        setTimeout(() => {
+        clearTimeout(piToast._hideTimer);
+        piToast._hideTimer = setTimeout(() => {
             piToast.classList.remove('pi-toast-visible');
             piToast.classList.add('pi-toast-hidden');
-        }, 3000);
-    });
+            piToast.classList.remove('pi-toast-error');
+        }, 3500);
+    }
 
     // Dark mode toggle dentro de Pagos Inteligentes
     document.getElementById('pi-dark-mode')?.addEventListener('click', () => {
