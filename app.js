@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
             target.classList.add('active');
             if (window.lucide) window.lucide.createIcons();
         }
+        // Mostrar/ocultar FAB de chat según pantalla activa
+        const fab = document.getElementById('fab-chat-btn');
+        if (fab) fab.style.display = screenId === 'dashboard-screen' ? 'flex' : 'none';
     };
 
     // ── Login state (declarado al inicio para evitar TDZ en triggerAuthFromPush) ──

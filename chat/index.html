@@ -375,6 +375,57 @@
         .chat-messages::-webkit-scrollbar { width: 4px; }
         .chat-messages::-webkit-scrollbar-track { background: transparent; }
         .chat-messages::-webkit-scrollbar-thumb { background: #dde3ea; border-radius: 2px; }
+
+        /* ── Bot thinking animation ── */
+        @keyframes botSpin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+
+        .chat-agent-avatar {
+            overflow: visible; /* allow ring to extend outside */
+        }
+
+        .chat-agent-avatar::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #00c9a7 0deg,
+                var(--bbva-light-blue) 120deg,
+                transparent 200deg,
+                transparent 360deg
+            );
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .chat-agent-avatar.thinking::after {
+            opacity: 1;
+            animation: botSpin 1s linear infinite;
+        }
+
+        /* typing indicator avatar also spins */
+        .msg-avatar {
+            position: relative;
+        }
+        .msg-avatar.thinking::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 50%;
+            background: conic-gradient(
+                #00c9a7 0deg,
+                var(--bbva-light-blue) 120deg,
+                transparent 200deg,
+                transparent 360deg
+            );
+            animation: botSpin 1s linear infinite;
+            z-index: -1;
+        }
     </style>
 </head>
 <body>
@@ -489,9 +540,14 @@
         lucide.createIcons();
     }
 
+    const headerAvatar   = document.querySelector('.chat-agent-avatar');
+    const typingAvatar    = typingEl.querySelector('.msg-avatar');
+
     function setAgentBusy(busy) {
         agentStatus.textContent = busy ? 'Escribiendo…' : 'En línea · listo para ayudarte';
         agentStatus.classList.toggle('online', !busy);
+        headerAvatar?.classList.toggle('thinking', busy);
+        typingAvatar?.classList.toggle('thinking', busy);
     }
 
     // ── Auto-resize textarea ──────────────────────────────────────────
