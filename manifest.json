@@ -1,7 +1,7 @@
 {
-  "name": "BBVA Colombia",
-  "short_name": "BBVA",
-  "description": "Gestiona tus finanzas de forma segura con BBVA Colombia",
+  "name": "Blue Agents Demo",
+  "short_name": "BA Demo",
+  "description": "Entorno de demostración — Pagos Inteligentes con agentes de IA",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

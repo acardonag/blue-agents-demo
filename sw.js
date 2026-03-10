@@ -14,10 +14,10 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // ── Cache ──────────────────────────────────────────────────────
-const CACHE_NAME = 'bbva-app-v16';
+const CACHE_NAME = 'bbva-app-v17';
 // Detectar base path según el dominio
 const IS_GITHUB = self.location.hostname === 'acardonag.github.io';
-const BASE = IS_GITHUB ? '/zcp' : '';
+const BASE = IS_GITHUB ? '/blue-agents-demo' : '';
 const ASSETS = [
     BASE + '/',
     BASE + '/index.html',

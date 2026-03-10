@@ -1137,7 +1137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (Notification.permission === 'granted') {
             new Notification('BBVA Colombia', {
                 body,
-                icon: '/zcp/icono-pwa.png'
+                icon: '/blue-agents-demo/icono-pwa.png'
             });
             console.log('✅ Notificación nativa del navegador enviada');
         } else {
