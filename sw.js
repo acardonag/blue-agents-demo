@@ -108,6 +108,11 @@ messaging.onBackgroundMessage((payload) => {
         actions = [
             { action: 'verify', title: '🔐 Verificar identidad' }
         ];
+    } else if (data.type === 'ORDER_PAYMENT_REQUEST') {
+        actions = [
+            { action: 'approve', title: '✅ Confirmar pago' },
+            { action: 'reject',  title: '❌ Rechazar' }
+        ];
     }
 
     return self.registration.showNotification(title || 'BBVA Colombia', {
@@ -118,10 +123,13 @@ messaging.onBackgroundMessage((payload) => {
         requireInteraction: true,
         vibrate:            [200, 100, 200],
         data: {
-            type:      data.type      || '',
-            cedula:    data.cedula    || '',
-            sessionId: data.sessionId || '',
-            userName:  data.userName  || ''
+            type:        data.type        || '',
+            cedula:      data.cedula      || '',
+            sessionId:   data.sessionId   || '',
+            userName:    data.userName    || '',
+            orderId:     data.orderId     || '',
+            productName: data.productName || '',
+            amount:      data.amount      || ''
         },
         actions
     });
@@ -139,6 +147,14 @@ self.addEventListener('notificationclick', (event) => {
     let targetUrl;
     if (data.type === 'AUTH_REQUEST') {
         targetUrl = base + '?auth=1&cedula=' + encodeURIComponent(data.cedula || '') + '&sessionId=' + encodeURIComponent(data.sessionId || '') + '&userName=' + encodeURIComponent(data.userName || '');
+    } else if (data.type === 'ORDER_PAYMENT_REQUEST') {
+        targetUrl = base + 'payment-approval.html'
+            + '?product='   + encodeURIComponent(data.productName || '')
+            + '&amount='    + encodeURIComponent(data.amount || '')
+            + '&reference=' + encodeURIComponent(data.orderId || '')
+            + '&orderId='   + encodeURIComponent(data.orderId || '')
+            + '&sessionId=' + encodeURIComponent(data.sessionId || '')
+            + '&cedula='    + encodeURIComponent(data.cedula || '');
     } else {
         targetUrl = base + '?push=1&type=' + (data.type || '') + '&session=' + (data.sessionId || '');
     }

@@ -515,6 +515,71 @@
             margin: 0;
             line-height: 1.6;
         }
+
+        /* ── Selector de Medio de Pago ── */
+        .pm-section {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+        }
+        .pm-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            margin: 0 0 12px;
+        }
+        .pm-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+        .pm-option:last-child  { border-bottom: none; padding-bottom: 0; }
+        .pm-option:first-child { padding-top: 0; }
+        .pm-radio {
+            width: 20px;
+            height: 20px;
+            accent-color: #004481;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .pm-info { flex: 1; }
+        .pm-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #004481;
+            margin: 0 0 2px;
+        }
+        .pm-balance {
+            font-size: 12px;
+            color: #888;
+            margin: 0;
+        }
+        .pm-icon-wrap {
+            width: 36px;
+            height: 36px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .pm-skeleton {
+            height: 60px;
+            border-radius: 8px;
+            background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0%   { background-position: -200% 0; }
+            100% { background-position:  200% 0; }
+        }
     </style>
 </head>
 
@@ -567,6 +632,14 @@
                 <div class="ap-info-box">
                     <i data-lucide="info" style="width:18px;height:18px;color:var(--bbva-light-blue);flex-shrink:0;margin-top:1px;"></i>
                     <p id="ap-info-text">Esta transacción será debitada de tu cuenta de ahorros principal. Tienes 5 minutos para confirmar esta operación.</p>
+                </div>
+
+                <!-- Medio de pago -->
+                <div class="pm-section" id="pm-section">
+                    <p class="pm-title">Medio de pago</p>
+                    <div id="pm-options">
+                        <div class="pm-skeleton"></div>
+                    </div>
                 </div>
 
                 <!-- Countdown -->
@@ -676,6 +749,10 @@
         const merchant    = params.get('merchant') || 'Compra Protegida';
         const card        = params.get('card')     || 'Visa *4242';
         const infoText    = params.get('info')     || 'Esta transacción será debitada de tu cuenta de ahorros principal. Tienes 5 minutos para confirmar esta operación.';
+        const orderId     = params.get('orderId')   || '';
+        const sessionId   = params.get('sessionId') || '';
+        const cedula      = params.get('cedula')    || localStorage.getItem('bbva_user_id') || '';
+        let selectedPaymentMethod = null;
 
         // Formatear monto
         const formatAmount = (val) => {
@@ -735,7 +812,7 @@
             document.getElementById('rejected-screen').classList.remove('active');
         }
 
-        function showReceipt(newBalance) {
+        function showReceipt(newBalance, paymentLabel) {
             clearInterval(countdown);
             // Poblar comprobante
             const now = new Date();
@@ -743,7 +820,7 @@
             document.getElementById('rec-desc').textContent      = `Pago de ${productName} exitoso.`;
             document.getElementById('rec-reference').textContent = reference;
             document.getElementById('rec-tx-id').textContent     = txId;
-            document.getElementById('rec-card').textContent      = card;
+            document.getElementById('rec-card').textContent      = paymentLabel || card;
             document.getElementById('rec-date').textContent      = now.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
             document.getElementById('rec-time').textContent      = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 
@@ -793,12 +870,14 @@
                 bioModal.style.display = 'none';
                 if (svg) { svg.style.color = ''; svg.style.stroke = ''; }
 
+                const source       = selectedPaymentMethod || params.get('source') || 'account';
+                const paymentLabel = source === 'card' ? 'Tarjeta de Crédito BBVA' : 'Cuenta de Ahorros BBVA';
+
                 // Debitar el monto en Firestore
                 let newBalance;
                 try {
-                    const cedula = localStorage.getItem('bbva_user_id');
-                    if (!cedula) throw new Error('No hay usuario en sesión');
-                    // Esperar a que Firebase esté listo (polling hasta 5 s)
+                    const userCedula = cedula || localStorage.getItem('bbva_user_id');
+                    if (!userCedula) throw new Error('No hay usuario en sesión');
                     const deduct = await new Promise((resolve, reject) => {
                         if (typeof window.deductPayment === 'function') { resolve(window.deductPayment); return; }
                         let attempts = 0;
@@ -808,21 +887,40 @@
                             else if (attempts >= 25) { clearInterval(iv); reject(new Error('Firebase no disponible después de 5 s')); }
                         }, 200);
                     });
-                    const source        = params.get('source') || 'account';
                     const numericAmount = parseInt(rawAmount.replace(/\D/g, ''), 10);
-                    const result        = await deduct(cedula, numericAmount, source);
+                    const result        = await deduct(userCedula, numericAmount, source);
                     newBalance          = result.newBalance;
                     console.log('✅ Pago debitado. Nuevo saldo:', newBalance);
                 } catch (err) {
                     console.error('❌ Error debitando pago:', err.message);
                 }
 
-                showReceipt(newBalance);
+                // Notificar resultado a n8n
+                if (orderId && sessionId) {
+                    try {
+                        await fetch('https://nuketownlabs-n8n.ko2m0t.easypanel.host/webhook/confirmar-pago', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ orderId, sessionId, approved: true, paymentMethod: source })
+                        });
+                    } catch (e) { console.error('❌ Error notificando a n8n:', e.message); }
+                }
+
+                showReceipt(newBalance, paymentLabel);
             }, 1200);
         });
 
         // ── Acciones ──
-        document.getElementById('btn-reject').addEventListener('click', () => {
+        document.getElementById('btn-reject').addEventListener('click', async () => {
+            if (orderId && sessionId) {
+                try {
+                    await fetch('https://nuketownlabs-n8n.ko2m0t.easypanel.host/webhook/confirmar-pago', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ orderId, sessionId, approved: false, paymentMethod: null })
+                    });
+                } catch (e) { console.error('❌ Error notificando rechazo:', e.message); }
+            }
             showRejected('Has rechazado esta operación.<br>Puedes cerrar esta ventana.');
         });
 
@@ -858,8 +956,80 @@
             }
         });
 
-        // Inicializar iconos
+        // ── Cargar medios de pago ──
+        async function loadPaymentMethods() {
+            const pmOptions  = document.getElementById('pm-options');
+            const userCedula = cedula || localStorage.getItem('bbva_user_id');
+            if (!userCedula) {
+                selectedPaymentMethod = 'account';
+                pmOptions.innerHTML   = buildPmOption('account', 'Cuenta de Ahorros', '', true);
+                addPmListeners();
+                return;
+            }
+            try {
+                const getUserFn = await new Promise((resolve, reject) => {
+                    if (typeof window.getUserByCedula === 'function') { resolve(window.getUserByCedula); return; }
+                    let attempts = 0;
+                    const iv = setInterval(() => {
+                        attempts++;
+                        if (typeof window.getUserByCedula === 'function') { clearInterval(iv); resolve(window.getUserByCedula); }
+                        else if (attempts >= 25) { clearInterval(iv); reject(new Error('Firebase timeout')); }
+                    }, 200);
+                });
+                const [userData, accountData, cardData] = await Promise.all([
+                    getUserFn(userCedula),
+                    typeof window.getUserAccount    === 'function' ? window.getUserAccount(userCedula)    : null,
+                    typeof window.getUserCreditCard === 'function' ? window.getUserCreditCard(userCedula) : null
+                ]);
+                const methods = userData?.piSettings?.paymentMethods || { account: true };
+                const fmt     = (n) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n);
+                const options = [];
+                if (methods.account) {
+                    const bal = accountData?.balance != null ? fmt(accountData.balance) : 'Saldo no disponible';
+                    options.push({ key: 'account', label: 'Cuenta de Ahorros', sub: `Saldo disponible: ${bal}` });
+                }
+                if (methods.card) {
+                    const avail   = cardData?.availableBalance != null ? fmt(cardData.availableBalance) : 'Cupo no disponible';
+                    const cardNum = cardData?.cardNumber || '';
+                    options.push({ key: 'card', label: `Tarjeta ${cardData?.brand || 'de Crédito'} ${cardNum}`, sub: `Cupo disponible: ${avail}` });
+                }
+                if (options.length === 0) options.push({ key: 'account', label: 'Cuenta de Ahorros', sub: '' });
+                selectedPaymentMethod = options[0].key;
+                pmOptions.innerHTML   = options.map((o, i) => buildPmOption(o.key, o.label, o.sub, i === 0)).join('');
+                addPmListeners();
+            } catch (err) {
+                console.error('❌ Error cargando medios de pago:', err.message);
+                selectedPaymentMethod = 'account';
+                pmOptions.innerHTML   = buildPmOption('account', 'Cuenta de Ahorros', '', true);
+                addPmListeners();
+            }
+        }
+
+        function buildPmOption(key, label, sub, checked) {
+            const icon = key === 'card'
+                ? `<i data-lucide="credit-card" style="width:18px;height:18px;color:#1173d4;"></i>`
+                : `<i data-lucide="landmark"    style="width:18px;height:18px;color:#004481;"></i>`;
+            const bg = key === 'card' ? '#eef4ff' : '#e8f0fb';
+            return `<label class="pm-option" for="pm-${key}">
+                        <input class="pm-radio" type="radio" name="pm" id="pm-${key}" value="${key}" ${checked ? 'checked' : ''}>
+                        <div class="pm-icon-wrap" style="background:${bg};">${icon}</div>
+                        <div class="pm-info">
+                            <p class="pm-label">${label}</p>
+                            ${sub ? `<p class="pm-balance">${sub}</p>` : ''}
+                        </div>
+                    </label>`;
+        }
+
+        function addPmListeners() {
+            document.querySelectorAll('input[name="pm"]').forEach(r => {
+                r.addEventListener('change', () => { selectedPaymentMethod = r.value; });
+            });
+            lucide.createIcons();
+        }
+
+        // Inicializar iconos y medios de pago
         lucide.createIcons();
+        loadPaymentMethods();
     })();
 
     // Register Service Worker
