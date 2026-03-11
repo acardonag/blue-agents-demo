@@ -669,6 +669,10 @@ document.addEventListener('DOMContentLoaded', () => {
             chats:     'Chat App',
             app:       'App'
         };
+        const SOURCE_LABELS = {
+            account: 'Cuenta de Ahorros',
+            card:    'Tarjeta de Crédito'
+        };
 
         try {
             const txs = await window.getTransactions(cedula);
@@ -685,10 +689,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const dayTime = date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
                               + ' · ' + date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
                 const amount  = '$' + parseInt(tx.amount).toLocaleString('es-CO');
-                const channel = tx.channel || 'app';
-                const icon    = CHANNEL_ICONS[channel]  || '📱';
-                const label   = CHANNEL_LABELS[channel] || channel;
-                const isPI    = tx.paidByPI;
+                const channel     = tx.channel || 'app';
+                const icon        = CHANNEL_ICONS[channel]  || '📱';
+                const label       = CHANNEL_LABELS[channel] || channel;
+                const isPI        = tx.paidByPI;
+                const source      = tx.source || 'account';
+                const sourceLabel = SOURCE_LABELS[source] || source;
 
                 if (month !== lastMonth) {
                     lastMonth = month;
@@ -700,12 +706,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const el = document.createElement('div');
                 el.className = 'mov-item';
+                el.dataset.source = source;
                 el.innerHTML = `
                     <div class="mov-icon-wrap ${isPI ? 'pi' : 'app'}" title="${label}">${icon}</div>
                     <div class="mov-info">
                         <div class="mov-product">${tx.productName || 'Pago'}</div>
                         <div class="mov-sub">
                             <span>${dayTime}</span>
+                            <span class="mov-source-badge ${source}">${source === 'card' ? '💳' : '🏦'} ${sourceLabel}</span>
                             ${isPI ? `<span class="mov-pi-badge">⚡ PI · ${label}</span>` : ''}
                         </div>
                     </div>
