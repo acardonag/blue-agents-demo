@@ -794,6 +794,14 @@ document.addEventListener('DOMContentLoaded', () => {
         loadMovimientos();
     });
 
+    // Botón atrás en movimientos
+    document.getElementById('mov-back')?.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.nav-item')[0].classList.add('active');
+        showScreen('dashboard-screen');
+        loadDashboardBalances();
+    });
+
     document.getElementById('nav-logout')?.addEventListener('click', () => {
         logoutModal.style.display = 'flex';
         if (window.lucide) window.lucide.createIcons();
