@@ -637,13 +637,99 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1200);
     });
 
-    // Home nav - sin lógica de cierre
+    // Home nav
     document.querySelectorAll('.nav-item')[0]?.addEventListener('click', () => {
-        // Inicio activo - sin acción adicional
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.nav-item')[0].classList.add('active');
+        showScreen('dashboard-screen');
+        loadDashboardBalances();
     });
+
+    async function loadMovimientos() {
+        const cedula = localStorage.getItem('bbva_user_id');
+        const list   = document.getElementById('mov-list');
+        const empty  = document.getElementById('mov-empty');
+        const loading = document.getElementById('mov-loading');
+        if (!list || !cedula) return;
+        list.innerHTML = '';
+        if (loading) loading.style.display = 'flex';
+        if (empty)   empty.style.display   = 'none';
+
+        const CHANNEL_ICONS = {
+            telegram:  '✈️',
+            whatsapp:  '💬',
+            alexa:     '🔵',
+            chats:     '💙',
+            app:       '📱'
+        };
+        const CHANNEL_LABELS = {
+            telegram:  'Telegram',
+            whatsapp:  'WhatsApp',
+            alexa:     'Alexa',
+            chats:     'Chat App',
+            app:       'App'
+        };
+
+        try {
+            const txs = await window.getTransactions(cedula);
+            if (loading) loading.style.display = 'none';
+            if (!txs || txs.length === 0) {
+                if (empty) empty.style.display = 'flex';
+                if (window.lucide) window.lucide.createIcons();
+                return;
+            }
+            let lastMonth = '';
+            txs.forEach(tx => {
+                const date    = new Date(tx.createdAt);
+                const month   = date.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+                const dayTime = date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+                              + ' · ' + date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+                const amount  = '$' + parseInt(tx.amount).toLocaleString('es-CO');
+                const channel = tx.channel || 'app';
+                const icon    = CHANNEL_ICONS[channel]  || '📱';
+                const label   = CHANNEL_LABELS[channel] || channel;
+                const isPI    = tx.paidByPI;
+
+                if (month !== lastMonth) {
+                    lastMonth = month;
+                    const lbl = document.createElement('div');
+                    lbl.className = 'mov-month-label';
+                    lbl.textContent = month.charAt(0).toUpperCase() + month.slice(1);
+                    list.appendChild(lbl);
+                }
+
+                const el = document.createElement('div');
+                el.className = 'mov-item';
+                el.innerHTML = `
+                    <div class="mov-icon-wrap ${isPI ? 'pi' : 'app'}" title="${label}">${icon}</div>
+                    <div class="mov-info">
+                        <div class="mov-product">${tx.productName || 'Pago'}</div>
+                        <div class="mov-sub">
+                            <span>${dayTime}</span>
+                            ${isPI ? `<span class="mov-pi-badge">⚡ PI · ${label}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="mov-amount">-${amount}</div>
+                `;
+                list.appendChild(el);
+            });
+        } catch (e) {
+            if (loading) loading.style.display = 'none';
+            console.error('[Movimientos] Error:', e);
+            if (list) list.innerHTML = '<p style="color:#999;text-align:center;padding:32px;">Error al cargar movimientos</p>';
+        }
+    }
 
     // Logout modal
     const logoutModal = document.getElementById('logout-modal');
+
+    // Movimientos nav
+    document.getElementById('nav-movimientos')?.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.getElementById('nav-movimientos').classList.add('active');
+        showScreen('movimientos-screen');
+        loadMovimientos();
+    });
 
     document.getElementById('nav-logout')?.addEventListener('click', () => {
         logoutModal.style.display = 'flex';

@@ -1,5 +1,5 @@
 import { initializeApp }                          from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, addDoc, query, getDocs, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getMessaging, getToken, onMessage }       from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging.js';
 
 // ── VAPID Key generada en Firebase Console → Project Settings → Cloud Messaging
@@ -255,7 +255,7 @@ async function deductPayment(cedula, amount, source = 'account') {
             lastTransactionAmount:  -amount
         });
         console.log(`✅ Débito cuenta: -$${amount.toLocaleString('es-CO')} | Nuevo saldo: $${newBalance.toLocaleString('es-CO')}`);
-        return { newBalance };
+        return { newBalance, source: 'account' };
     }
 
     if (source === 'card') {
@@ -272,10 +272,32 @@ async function deductPayment(cedula, amount, source = 'account') {
             lastTransactionAmount:  -amount
         });
         console.log(`✅ Cargo tarjeta: -$${amount.toLocaleString('es-CO')} | Cupo restante: $${newBalance.toLocaleString('es-CO')}`);
-        return { newBalance };
+        return { newBalance, source: 'card' };
     }
 
     throw new Error('Fuente de pago inválida: ' + source);
+}
+
+// ── Guardar transacción en Firestore ────────────────────────────
+async function saveTransaction(cedula, { amount, source, productName, orderId, channel = 'app' }) {
+    const txRef = collection(db, 'transactions', cedula, 'records');
+    await addDoc(txRef, {
+        amount,
+        source,          // 'account' | 'card'
+        productName,
+        orderId,
+        channel,         // 'telegram' | 'whatsapp' | 'alexa' | 'chats' | 'app'
+        paidByPI: channel !== 'app',   // true si fue via Pagos Inteligentes
+        createdAt: new Date().toISOString()
+    });
+}
+
+// ── Leer transacciones del usuario ──────────────────────────────
+async function getTransactions(cedula, maxItems = 50) {
+    const txRef = collection(db, 'transactions', cedula, 'records');
+    const q     = query(txRef, orderBy('createdAt', 'desc'), limit(maxItems));
+    const snap  = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 // ── Solicitar permiso push y obtener FCM Token ────────────────
@@ -392,6 +414,8 @@ window.createUserFinancialData     = createUserFinancialData;
 window.getUserAccount              = getUserAccount;
 window.getUserCreditCard           = getUserCreditCard;
 window.deductPayment               = deductPayment;
+window.saveTransaction             = saveTransaction;
+window.getTransactions             = getTransactions;
 window.firestoreDoc                = doc;
 window.firestoreSetDoc             = setDoc;
 window.firestoreGetDoc             = getDoc;

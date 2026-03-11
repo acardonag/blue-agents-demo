@@ -959,6 +959,17 @@
                     const result        = await deduct(userCedula, numericAmount, source);
                     newBalance          = result.newBalance;
                     console.log('✅ Pago debitado. Nuevo saldo:', newBalance);
+
+                    // Guardar transacción en historial
+                    if (typeof window.saveTransaction === 'function') {
+                        window.saveTransaction(userCedula, {
+                            amount:      numericAmount,
+                            source,
+                            productName: productName || 'Pago',
+                            orderId:     orderId || '',
+                            channel:     'telegram'   // pagos de PI llegan por Telegram
+                        }).catch(e => console.warn('[TX] No se pudo guardar:', e.message));
+                    }
                 } catch (err) {
                     console.error('❌ Error debitando pago:', err.message);
                 }

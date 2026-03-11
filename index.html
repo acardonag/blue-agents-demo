@@ -549,13 +549,31 @@
                 <div class="center-btn">
                     <i data-lucide="plus"></i>
                 </div>
-                <div class="nav-item">
-                    <i data-lucide="receipt"></i>
-                    <span>Pagos</span>
+                <div class="nav-item" id="nav-movimientos">
+                    <i data-lucide="list"></i>
+                    <span>Movimientos</span>
                 </div>
                 <div class="nav-item" id="nav-logout">
                     <i data-lucide="log-out"></i>
                     <span>Salir</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- SCREEN: MOVIMIENTOS -->
+        <section id="movimientos-screen" class="screen fade-in">
+            <div class="mov-header">
+                <span class="mov-title">Movimientos</span>
+            </div>
+            <div class="mov-body" id="mov-body">
+                <div class="mov-loading" id="mov-loading">
+                    <div class="mov-spinner"></div>
+                    <p>Cargando movimientos…</p>
+                </div>
+                <div id="mov-list"></div>
+                <div class="mov-empty" id="mov-empty" style="display:none">
+                    <i data-lucide="inbox" style="width:48px;height:48px;color:#ccc;"></i>
+                    <p>Aún no tienes movimientos</p>
                 </div>
             </div>
         </section>
