@@ -828,6 +828,24 @@
         // Generar ID de transacción aleatorio
         const txId = Math.floor(100000000 + Math.random() * 900000000).toString();
 
+        // Marcar pago como resuelto en IndexedDB (oculta la card del dashboard)
+        function clearPendingPayment(id) {
+            if (!id) return;
+            try {
+                const req = indexedDB.open('bbva-pending', 1);
+                req.onsuccess = e => {
+                    const db    = e.target.result;
+                    const tx    = db.transaction('payments', 'readwrite');
+                    const store = tx.objectStore('payments');
+                    const get   = store.get(id);
+                    get.onsuccess = ev => {
+                        const rec = ev.target.result;
+                        if (rec) { rec.status = 'resolved'; store.put(rec); }
+                    };
+                };
+            } catch (e) { /* silencioso */ }
+        }
+
         // ── Poblar Approval Screen ──
         document.getElementById('ap-product-name').textContent = productName;
         document.getElementById('ap-reference').textContent    = reference;
@@ -987,6 +1005,7 @@
 
                 // Ocultar spinner y mostrar recibo
                 processingOverlay.style.display = 'none';
+                clearPendingPayment(orderId);
                 showReceipt(newBalance, paymentLabel);
             }, 1200);
         });
@@ -1002,6 +1021,7 @@
                     });
                 } catch (e) { console.error('❌ Error notificando rechazo:', e.message); }
             }
+            clearPendingPayment(orderId);
             showRejected('Has rechazado esta operación.<br>Puedes cerrar esta ventana.');
         });
 

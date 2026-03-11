@@ -102,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Quitar skeleton aunque falle
             [balanceEl, cardBalanceEl, cardNumEl].forEach(el => el?.classList.remove('skeleton'));
         }
+        checkPendingPayment(cedula);
     }
 
     updateUI();
@@ -644,6 +645,60 @@ document.addEventListener('DOMContentLoaded', () => {
         showScreen('dashboard-screen');
         loadDashboardBalances();
     });
+
+    // ── Pago pendiente: IndexedDB helpers ──────────────────────
+    function openPendingDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open('bbva-pending', 1);
+            req.onupgradeneeded = e => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains('payments')) {
+                    db.createObjectStore('payments', { keyPath: 'orderId' });
+                }
+            };
+            req.onsuccess = e => resolve(e.target.result);
+            req.onerror   = e => reject(e.target.error);
+        });
+    }
+
+    async function checkPendingPayment(cedula) {
+        const FIVE_MIN = 5 * 60 * 1000;
+        const card     = document.getElementById('pending-payment-card');
+        if (!card) return;
+        try {
+            const db  = await openPendingDB();
+            const all = await new Promise((resolve, reject) => {
+                const t   = db.transaction('payments', 'readonly');
+                const req = t.objectStore('payments').getAll();
+                req.onsuccess = e => resolve(e.target.result);
+                req.onerror   = e => reject(e.target.error);
+            });
+            const now     = Date.now();
+            const pending = all.find(p =>
+                p.cedula  === cedula &&
+                p.status  === 'pending' &&
+                (now - p.timestamp) < FIVE_MIN
+            );
+            if (pending) {
+                const sub = document.getElementById('pending-sub-text');
+                if (sub) sub.innerHTML = `${pending.productName} &bull; <strong>$${parseInt(pending.amount).toLocaleString('es-CO')}</strong>`;
+                card.href = `payment-approval.html`
+                    + `?product=${encodeURIComponent(pending.productName)}`
+                    + `&amount=${encodeURIComponent(pending.amount)}`
+                    + `&reference=${encodeURIComponent(pending.orderId)}`
+                    + `&orderId=${encodeURIComponent(pending.orderId)}`
+                    + `&sessionId=${encodeURIComponent(pending.sessionId)}`
+                    + `&cedula=${encodeURIComponent(pending.cedula)}`;
+                card.style.display = 'flex';
+                if (window.lucide) window.lucide.createIcons();
+            } else {
+                card.style.display = 'none';
+            }
+        } catch (e) {
+            console.warn('[PendingPayment] Error:', e);
+            card.style.display = 'none';
+        }
+    }
 
     async function loadMovimientos() {
         const cedula = localStorage.getItem('bbva_user_id');

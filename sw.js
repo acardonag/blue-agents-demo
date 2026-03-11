@@ -92,6 +92,36 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
+// ── IndexedDB: guardar pago pendiente para recuperarlo al hacer login ──
+function savePendingPaymentIDB(data) {
+    return new Promise((resolve) => {
+        const req = indexedDB.open('bbva-pending', 1);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains('payments')) {
+                db.createObjectStore('payments', { keyPath: 'orderId' });
+            }
+        };
+        req.onsuccess = e => {
+            const db    = e.target.result;
+            const tx    = db.transaction('payments', 'readwrite');
+            const store = tx.objectStore('payments');
+            store.put({
+                orderId:     data.orderId     || '',
+                cedula:      data.cedula      || '',
+                productName: data.productName || '',
+                amount:      data.amount      || '',
+                sessionId:   data.sessionId   || '',
+                timestamp:   Date.now(),
+                status:      'pending'
+            });
+            tx.oncomplete = resolve;
+            tx.onerror    = resolve;
+        };
+        req.onerror = resolve;
+    });
+}
+
 // ── FCM: notificaciones en BACKGROUND ─────────────────────────
 messaging.onBackgroundMessage((payload) => {
     console.log('[SW] 🔔 Push en background:', payload);
@@ -115,7 +145,7 @@ messaging.onBackgroundMessage((payload) => {
         ];
     }
 
-    return self.registration.showNotification(title || 'BBVA Colombia', {
+    const notifPromise = self.registration.showNotification(title || 'BBVA Colombia', {
         body:               body || 'Tienes una nueva notificación',
         icon:               '/icono-pwa.png',
         badge:              '/icono-pwa.png',
@@ -133,6 +163,10 @@ messaging.onBackgroundMessage((payload) => {
         },
         actions
     });
+    if (data.type === 'ORDER_PAYMENT_REQUEST') {
+        return Promise.all([notifPromise, savePendingPaymentIDB(data)]);
+    }
+    return notifPromise;
 });
 
 // ── Clic en la notificación ────────────────────────────────────

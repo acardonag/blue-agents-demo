@@ -522,13 +522,13 @@
                     </div>
                 </div>
 
-                <!-- Pago pendiente (demo) -->
-                <a id="pending-payment-card" class="pending-payment-card" href="payment-approval.html?product=Camiseta+de+la+selecci%C3%B3n+Colombia&amount=320000&reference=29384756&card=Visa+*4592&merchant=Adidas+Colombia">
+                <!-- Pago pendiente (dinámico — visible solo si hay pedido < 5 min sin confirmar) -->
+                <a id="pending-payment-card" class="pending-payment-card" href="#" style="display:none">
                     <div class="pending-left">
                         <div class="pending-dot"></div>
                         <div>
                             <p class="pending-title">Pago pendiente de aprobación</p>
-                            <p class="pending-sub">Camiseta de la selección &bull; <strong>$320.000</strong></p>
+                            <p class="pending-sub" id="pending-sub-text"></p>
                         </div>
                     </div>
                     <i data-lucide="chevron-right" style="width:18px;height:18px;color:#999;flex-shrink:0;"></i>
