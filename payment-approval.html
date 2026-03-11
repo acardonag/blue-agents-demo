@@ -756,6 +756,11 @@
         const cedula      = params.get('cedula')    || localStorage.getItem('bbva_user_id') || '';
         let selectedPaymentMethod = null;
 
+        // Si llegamos desde un push sin sesión activa, guardar cedula para que el dashboard funcione al volver
+        if (cedula && !localStorage.getItem('bbva_user_id')) {
+            localStorage.setItem('bbva_user_id', cedula);
+        }
+
         // Formatear monto
         const formatAmount = (val) => {
             const n = parseInt(val.replace(/\D/g, ''), 10);
