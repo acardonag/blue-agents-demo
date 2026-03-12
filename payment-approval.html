@@ -811,6 +811,7 @@
         const orderId     = params.get('orderId')   || '';
         const sessionId   = params.get('sessionId') || '';
         const cedula      = params.get('cedula')    || localStorage.getItem('bbva_user_id') || '';
+        const storeId     = params.get('storeId')   || '';
         let selectedPaymentMethod = null;
 
         // Si llegamos desde un push sin sesión activa, guardar cedula para que el dashboard funcione al volver
@@ -998,7 +999,7 @@
                         await fetch('https://nuketownlabs-n8n.ko2m0t.easypanel.host/webhook/confirmar-pago', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ orderId, sessionId, approved: true, paymentMethod: source })
+                            body: JSON.stringify({ orderId, sessionId, approved: true, paymentMethod: source, storeId })
                         });
                     } catch (e) { console.error('❌ Error notificando a n8n:', e.message); }
                 }
@@ -1017,7 +1018,7 @@
                     await fetch('https://nuketownlabs-n8n.ko2m0t.easypanel.host/webhook/confirmar-pago', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ orderId, sessionId, approved: false, paymentMethod: null })
+                        body: JSON.stringify({ orderId, sessionId, approved: false, paymentMethod: null, storeId })
                     });
                 } catch (e) { console.error('❌ Error notificando rechazo:', e.message); }
             }

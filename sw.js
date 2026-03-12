@@ -159,7 +159,8 @@ messaging.onBackgroundMessage((payload) => {
             userName:    data.userName    || '',
             orderId:     data.orderId     || '',
             productName: data.productName || '',
-            amount:      data.amount      || ''
+            amount:      data.amount      || '',
+            storeId:     data.storeId     || ''
         },
         actions
     });
@@ -188,7 +189,8 @@ self.addEventListener('notificationclick', (event) => {
             + '&reference=' + encodeURIComponent(data.orderId || '')
             + '&orderId='   + encodeURIComponent(data.orderId || '')
             + '&sessionId=' + encodeURIComponent(data.sessionId || '')
-            + '&cedula='    + encodeURIComponent(data.cedula || '');
+            + '&cedula='    + encodeURIComponent(data.cedula || '')
+            + '&storeId='   + encodeURIComponent(data.storeId || '');
     } else {
         targetUrl = base + '?push=1&type=' + (data.type || '') + '&session=' + (data.sessionId || '');
     }
