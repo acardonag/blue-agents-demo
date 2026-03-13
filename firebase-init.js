@@ -279,13 +279,14 @@ async function deductPayment(cedula, amount, source = 'account') {
 }
 
 // ── Guardar transacción en Firestore ────────────────────────────
-async function saveTransaction(cedula, { amount, source, productName, orderId, channel = 'app' }) {
+async function saveTransaction(cedula, { amount, source, productName, orderId, channel = 'app', storeId = '' }) {
     const txRef = collection(db, 'transactions', cedula, 'records');
     await addDoc(txRef, {
         amount,
         source,          // 'account' | 'card'
         productName,
         orderId,
+        storeId,         // identificador de la tienda WooCommerce
         channel,         // 'telegram' | 'whatsapp' | 'alexa' | 'chats' | 'app'
         paidByPI: channel !== 'app',   // true si fue via Pagos Inteligentes
         createdAt: new Date().toISOString()

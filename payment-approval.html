@@ -986,6 +986,7 @@
                             source,
                             productName: productName || 'Pago',
                             orderId:     orderId || '',
+                            storeId:     storeId || '',
                             channel:     'telegram'   // pagos de PI llegan por Telegram
                         }).catch(e => console.warn('[TX] No se pudo guardar:', e.message));
                     }

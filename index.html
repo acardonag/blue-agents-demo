@@ -18,7 +18,7 @@
             if (window.caches) {
                 caches.keys().then(keys => {
                     keys.forEach(key => {
-                        if (!key.includes('v15')) {
+                        if (!key.includes('v17')) {
                             console.log('[Cache] Eliminando cache viejo:', key);
                             caches.delete(key);
                         }
