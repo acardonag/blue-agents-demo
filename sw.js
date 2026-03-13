@@ -190,7 +190,8 @@ self.addEventListener('notificationclick', (event) => {
             + '&orderId='   + encodeURIComponent(data.orderId || '')
             + '&sessionId=' + encodeURIComponent(data.sessionId || '')
             + '&cedula='    + encodeURIComponent(data.cedula || '')
-            + '&storeId='   + encodeURIComponent(data.storeId || '');
+            + '&storeId='   + encodeURIComponent(data.storeId || '')
+            + '&image='     + encodeURIComponent(data.imageUrl || '');
     } else {
         targetUrl = base + '?push=1&type=' + (data.type || '') + '&session=' + (data.sessionId || '');
     }
