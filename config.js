@@ -13,3 +13,5 @@ export const BBVA_FIREBASE_VAPID_KEY = 'BMZi10qT5B_s2BonvSbZIUohtFeVnuS3MZqt2UrV
 // URL del backend Gemini Live (vacío hasta despliegue en Cloud Run).
 // Cuando esté desplegado, ponlo aquí: 'https://TU_CLOUD_RUN_URL'
 export const VOICE_AGENT_BACKEND_URL = '';
+
+// Mantener este archivo como ESM puro: no agregar comandos de shell aquí.
