@@ -845,7 +845,20 @@
         const infoText    = params.get('info')     || 'Esta transacción será debitada de tu cuenta de ahorros principal. Tienes 5 minutos para confirmar esta operación.';
         const orderId     = params.get('orderId')   || '';
         const orderKey    = params.get('orderKey')  || '';
-        const sessionId   = params.get('sessionId') || '';
+        const normalizeSessionId = (value) => {
+            const cleaned = String(value || '').trim();
+            if (!cleaned) return '';
+            if (['none', 'null', 'undefined'].includes(cleaned.toLowerCase())) return '';
+            return cleaned;
+        };
+        const sessionIdFromQuery = normalizeSessionId(params.get('sessionId'));
+        const sessionIdFromState = normalizeSessionId(
+            sessionStorage.getItem('bbva_auth_session')
+            || sessionStorage.getItem('bbva_push_session_id')
+            || localStorage.getItem('bbva_auth_session')
+            || localStorage.getItem('bbva_push_session_id')
+        );
+        const sessionId   = sessionIdFromQuery || sessionIdFromState;
         const cedula      = params.get('cedula')    || localStorage.getItem('bbva_user_id') || '';
         const storeId     = params.get('storeId')   || '';
         const productId   = params.get('productId') || '';
@@ -860,6 +873,9 @@
         // Si llegamos desde un push sin sesión activa, guardar cedula para que el dashboard funcione al volver
         if (cedula && !localStorage.getItem('bbva_user_id')) {
             localStorage.setItem('bbva_user_id', cedula);
+        }
+        if (sessionId) {
+            sessionStorage.setItem('bbva_auth_session', sessionId);
         }
 
         // Formatear monto
@@ -935,7 +951,22 @@
         }, 1000);
 
         async function notifyPaymentResult(approved, paymentMethod) {
-            if (!orderId || !sessionId) return;
+            if (!orderId || !sessionId) {
+                console.warn('⚠️ No se pudo notificar el resultado: faltan orderId o sessionId.', {
+                    orderId,
+                    sessionId
+                });
+                return;
+            }
+
+            console.log('[BBVA Payment] Notificando resultado de pago', {
+                approved,
+                sessionId,
+                orderId,
+                orderKey,
+                cedula,
+                productName
+            });
 
             const payload = {
                 orderId,
@@ -969,10 +1000,11 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         orderId,
+                        orderKey,
                         sessionId,
-                        status: 'processing',
                         storeId,
-                        storeName: ''
+                        cedula,
+                        status: 'processing'
                     })
                 });
             }

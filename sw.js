@@ -26,9 +26,29 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
     console.log('[SW v14] Instalando...');
     self.skipWaiting();
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
-    );
+    event.waitUntil((async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const results = await Promise.allSettled(
+            ASSETS.map(async (asset) => {
+                const response = await fetch(asset, { cache: 'no-cache' });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status} al cachear ${asset}`);
+                }
+                await cache.put(asset, response);
+            })
+        );
+
+        const failed = results
+            .map((result, index) => ({ result, asset: ASSETS[index] }))
+            .filter(({ result }) => result.status === 'rejected');
+
+        if (failed.length) {
+            console.warn('[SW v14] Algunos assets no se pudieron precachear:', failed.map(({ asset, result }) => ({
+                asset,
+                error: result.reason?.message || String(result.reason)
+            })));
+        }
+    })());
 });
 
 // ── Activate ───────────────────────────────────────────────────
@@ -127,18 +147,6 @@ function savePendingPaymentIDB(data) {
 }
 
 // ── FCM: notificaciones en BACKGROUND ─────────────────────────
-self.addEventListener('push', (event) => {
-    event.waitUntil((async () => {
-        const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        for (const client of clientsList) {
-            client.postMessage({
-                type: 'SW_PUSH_NATIVE',
-                raw: event.data ? event.data.text() : ''
-            });
-        }
-    })());
-});
-
 onBackgroundMessage(messaging, (payload) => {
     console.log('[SW] 🔔 Push en background:', payload);
     const { title, body } = payload.notification || {};
@@ -189,21 +197,10 @@ onBackgroundMessage(messaging, (payload) => {
         },
         actions
     });
-    const notifyClientsPromise = (async () => {
-        const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        for (const client of clientsList) {
-            client.postMessage({
-                type: 'SW_BACKGROUND_PUSH',
-                title: title || 'BBVA Colombia',
-                body: body || 'Tienes una nueva notificación',
-                data
-            });
-        }
-    })();
     if (data.type === 'ORDER_PAYMENT_REQUEST') {
-        return Promise.all([notifPromise, savePendingPaymentIDB(data), notifyClientsPromise]);
+        return Promise.all([notifPromise, savePendingPaymentIDB(data)]);
     }
-    return Promise.all([notifPromise, notifyClientsPromise]);
+    return notifPromise;
 });
 
 // ── Clic en la notificación ────────────────────────────────────
